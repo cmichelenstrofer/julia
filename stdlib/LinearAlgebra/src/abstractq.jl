@@ -219,9 +219,7 @@ lmul!(A::QRCompactWYQ{T,<:StridedMatrix}, B::StridedVecOrMat{T}) where {T<:BlasF
     LAPACK.gemqrt!('L', 'N', A.factors, A.T, B)
 lmul!(A::QRPackedQ{T,<:StridedMatrix}, B::StridedVecOrMat{T}) where {T<:BlasFloat} =
     LAPACK.ormqr!('L', 'N', A.factors, A.τ, B)
-lmul!(A::QRPackedQ, B::AbstractVector) = _lmul!(A, B)
-lmul!(A::QRPackedQ, B::AbstractMatrix) = _lmul!(A, B)
-function _lmul!(A::QRPackedQ, B::AbstractVecOrMat)
+function lmul!(A::QRPackedQ, B::AbstractVecOrMat)
     require_one_based_indexing(B)
     mA, nA = size(A.factors)
     mB, nB = size(B,1), size(B,2)
@@ -257,9 +255,7 @@ lmul!(adjQ::AdjointQ{<:Any,<:QRPackedQ{T,<:StridedMatrix}}, B::StridedVecOrMat{T
     (Q = adjQ.Q; LAPACK.ormqr!('L', 'T', Q.factors, Q.τ, B))
 lmul!(adjQ::AdjointQ{<:Any,<:QRPackedQ{T,<:StridedMatrix}}, B::StridedVecOrMat{T}) where {T<:BlasComplex} =
     (Q = adjQ.Q; LAPACK.ormqr!('L', 'C', Q.factors, Q.τ, B))
-lmul!(adjQ::AdjointQ{<:Any,<:QRPackedQ}, B::AbstractVector) = _lmul!(adjQ, B)
-lmul!(adjQ::AdjointQ{<:Any,<:QRPackedQ}, B::AbstractMatrix) = _lmul!(adjQ, B)
-function _lmul!(adjA::AdjointQ{<:Any,<:QRPackedQ}, B::AbstractVecOrMat)
+function lmul!(adjA::AdjointQ{<:Any,<:QRPackedQ}, B::AbstractVecOrMat)
     require_one_based_indexing(B)
     A = adjA.Q
     mA, nA = size(A.factors)

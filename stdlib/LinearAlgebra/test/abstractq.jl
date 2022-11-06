@@ -16,7 +16,7 @@ n = 5
     end
     MyQ{T}(Q::AbstractQ) where {T} = (P = convert(AbstractQ{T}, Q); MyQ{T,typeof(P)}(P))
     MyQ(Q::MyQ) = Q
-    
+
     Base.size(Q::MyQ) = size(Q.Q)
     LinearAlgebra.lmul!(Q::MyQ, B::AbstractVecOrMat) = lmul!(Q.Q, B)
     LinearAlgebra.lmul!(adjQ::AdjointQ{<:Any,<:MyQ}, B::AbstractVecOrMat) = lmul!(parent(adjQ).Q', B)

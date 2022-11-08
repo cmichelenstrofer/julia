@@ -515,7 +515,7 @@ size(F::Union{QR,QRCompactWY,QRPivoted}, dim::Integer) = size(getfield(F, :facto
 
 
 function ldiv!(A::QRCompactWY{T}, b::AbstractVector{T}) where {T<:BlasFloat}
-    require_one_based_indexing(b)
+    require_one_based_indexing(B)
     m, n = size(A)
     ldiv!(UpperTriangular(view(A.factors, 1:min(m,n), 1:n)), view(lmul!(adjoint(A.Q), b), 1:size(A, 2)))
     return b
@@ -528,7 +528,7 @@ function ldiv!(A::QRCompactWY{T}, B::AbstractMatrix{T}) where {T<:BlasFloat}
 end
 
 # Julia implementation similar to xgelsy
-function ldiv!(A::QRPivoted{T}, B::StridedMatrix{T}, rcond::Real) where T<:BlasFloat
+function ldiv!(A::QRPivoted{T}, B::AbstractMatrix{T}, rcond::Real) where T<:BlasFloat
     mA, nA = size(A.factors)
     nr = min(mA,nA)
     nrhs = size(B, 2)
@@ -564,11 +564,11 @@ function ldiv!(A::QRPivoted{T}, B::StridedMatrix{T}, rcond::Real) where T<:BlasF
     B[A.p,:] = B[1:nA,:]
     return B, rnk
 end
-ldiv!(A::QRPivoted{T}, B::StridedVector{T}) where {T<:BlasFloat} =
+ldiv!(A::QRPivoted{T}, B::AbstractVector{T}) where {T<:BlasFloat} =
     vec(ldiv!(A, reshape(B, length(B), 1)))
-ldiv!(A::QRPivoted{T}, B::StridedVecOrMat{T}) where {T<:BlasFloat} =
+ldiv!(A::QRPivoted{T}, B::AbstractMatrix{T}) where {T<:BlasFloat} =
     ldiv!(A, B, min(size(A)...)*eps(real(float(one(eltype(B))))))[1]
-function _wide_qr_ldiv!(A::QR{T}, B::StridedMatrix{T}) where T
+function _wide_qr_ldiv!(A::QR{T}, B::AbstractMatrix{T}) where T
     m, n = size(A)
     minmn = min(m,n)
     mB, nB = size(B)
@@ -616,7 +616,7 @@ function _wide_qr_ldiv!(A::QR{T}, B::StridedMatrix{T}) where T
 end
 
 
-function ldiv!(A::QR{T}, B::StridedMatrix{T}) where T
+function ldiv!(A::QR{T}, B::AbstractMatrix{T}) where T
     m, n = size(A)
     m < n && return _wide_qr_ldiv!(A, B)
 
@@ -625,17 +625,17 @@ function ldiv!(A::QR{T}, B::StridedMatrix{T}) where T
     ldiv!(UpperTriangular(view(R,1:n,:)), view(B, 1:n, :))
     return B
 end
-function ldiv!(A::QR, B::StridedVector)
+function ldiv!(A::QR, B::AbstractVector)
     ldiv!(A, reshape(B, length(B), 1))
     return B
 end
 
-function ldiv!(A::QRPivoted, b::StridedVector)
+function ldiv!(A::QRPivoted, b::AbstractVector)
     ldiv!(QR(A.factors,A.τ), b)
     b[1:size(A.factors, 2)] = view(b, 1:size(A.factors, 2))[invperm(A.jpvt)]
     b
 end
-function ldiv!(A::QRPivoted, B::StridedMatrix)
+function ldiv!(A::QRPivoted, B::AbstractMatrix)
     ldiv!(QR(A.factors, A.τ), B)
     B[1:size(A.factors, 2),:] = view(B, 1:size(A.factors, 2), :)[invperm(A.jpvt),:]
     B

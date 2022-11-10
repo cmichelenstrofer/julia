@@ -148,6 +148,13 @@ mul!(C::AbstractVecOrMat{T}, A::AbstractVecOrMat{T}, Q::AbstractQ{T}) where {T} 
 mul!(C::AbstractVecOrMat{T}, adjQ::AdjointQ{T}, B::AbstractVecOrMat{T}) where {T} = lmul!(adjQ, copyto!(C, B))
 mul!(C::AbstractVecOrMat{T}, A::AbstractVecOrMat{T}, adjQ::AdjointQ{T}) where {T} = rmul!(copyto!(C, A), adjQ)
 
+### division
+\(Q::AbstractQ, A::AbstractVecOrMat) = Q'*A
+/(A::AbstractVecOrMat, Q::AbstractQ) = A*Q'
+ldiv!(Q::AbstractQ, A::AbstractVecOrMat) = lmul!(Q', A)
+ldiv!(C::AbstractVecOrMat, Q::AbstractQ, A::AbstractVecOrMat) = mul!(C, Q', A)
+rdiv!(A::AbstractVecOrMat, Q::AbstractQ) = rmul!(A, Q')
+
 ###########################################################
 ################ Q from QR decompositions #################
 ###########################################################

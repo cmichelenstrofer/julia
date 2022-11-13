@@ -1907,3 +1907,35 @@ end
 precompile(include_package_for_output, (PkgId, String, Vector{String}, Vector{String}, Vector{String}, typeof(_concrete_dependencies), Nothing))
 precompile(include_package_for_output, (PkgId, String, Vector{String}, Vector{String}, Vector{String}, typeof(_concrete_dependencies), String))
 precompile(create_expr_cache, (PkgId, String, String, typeof(_concrete_dependencies), IO, IO))
+
+
+# Glue code
+
+struct GluePkgId
+    parent::PkgId
+    name::String
+end
+
+compute_uuid(id::GluePkgId) = uuid5(id.parent.uuid, id.name)
+
+struct GlueCallback
+    pkgs::Vector{PkgId}
+    file::String
+end
+
+const GLUE_CALLBACKS = GlueCallback[]
+
+function add_glue_code(m::Module, pkgs::Vector{String}, file::AbstractString)
+    id = PkgId(m)
+    glue_file = joinpath(pkgdir(id), "glue", file)
+    pkgs = [Base.identify_glue_package(id, name) for name in pgs]
+    cb = GlueCallBack(pkgs, glue_file)
+    push!(GLUE_CALLBACKS, cb)
+    return nothing
+end
+
+macro add_glue_code(pkg, file)
+    return :(add_glue_code(__module__, [$(esc(pkg))], $(esc(file))))
+end
+
+Base.@add_glue_code OffsetArrays "GlueOffsetArrays.jl"

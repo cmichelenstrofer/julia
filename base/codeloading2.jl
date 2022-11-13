@@ -3,6 +3,9 @@
 # Implicit environments #
 #########################
 
+using UUIDs
+using Base: PkgId, isaccessibledir, isfile_casesensitive, project_names, manifest_names,
+parsed_toml, project_file_uuid
 struct ImplicitEnvPkg
     path::String # The entry point of the package relative to the implicit environment path
     uuid::Union{Nothing, UUID}
@@ -101,7 +104,9 @@ struct ExplicitEnv
     path::String
     project_deps::Dict{String, UUID} # [deps] in Project.toml
     project_extras::Dict{String, UUID} # [extras] in Project.toml
+    project_weakdeps::Dict{String, UUID} # [weakdeps] in Project.toml
     deps::Dict{UUID, Dict{String, UUID}} # all dependencies in Manifest.toml
+    weak_deps::Dict{UUID, Dict{String, UUID}} # all weak dependencies in Manifest.toml
     lookup_strategy::Dict{UUID, Union{
                                       SHA1,     # `git-tree-sha1` entry
                                       String,   # `path` entry
@@ -119,6 +124,12 @@ function ExplicitEnv(envpath::String)
     # Collect all direct dependencies of the project
     for (name, uuid) in get(Dict{String, Any}, project_d, "deps")::Dict{String, Any}
         project_deps[name] = UUID(uuid::String)
+    end
+
+    project_weakdeps = Dict{String, UUID}()
+    # Collect all weak dependencies of the project
+    for (name, uuid) in get(Dict{String, Any}, project_d, "weakdeps")::Dict{String, Any}
+        project_weakdeps[name] = UUID(uuid::String)
     end
 
     project_extras = Dict{String, UUID}()
@@ -142,6 +153,8 @@ function ExplicitEnv(envpath::String)
     # in which case it is a `Vector{String}` or expanded where it is a `name => uuid` mapping.
     deps = Dict{UUID, Union{Vector{String}, Dict{String, UUID}}}()
     sizehint!(deps, length(manifest_d))
+    weakdeps = Dict{UUID, Union{Vector{String}, Dict{String, UUID}}}()
+    sizehint!(weakdeps, length(manifest_d))
     name_to_uuid = Dict{String, UUID}()
     sizehint!(name_to_uuid, length(manifest_d))
     lookup_strategy = Dict{UUID, Union{SHA1, String, Nothing, Missing}}()
@@ -156,13 +169,15 @@ function ExplicitEnv(envpath::String)
             # but that is fine since we will only use the information in here for packages
             # with unique names
             name_to_uuid[name] = m_uuid
-            deps_pkg = get(Vector{String}, pkg_info, "deps")::Union{Vector{String}, Dict{String, Any}}
-            # Compressed format with unique names:
-            if deps_pkg isa Vector{String}
-                deps[m_uuid] = deps_pkg
-            # Exapanded format:
-            else
-                deps[m_uuid] = Dict{String, UUID}(name_dep => UUID(dep_uuid::String) for (name_dep, dep_uuid) in deps_pkg)
+            for (key, map) in [("deps", deps), ("weakdeps", weakdeps)]
+                deps_pkg = get(Vector{String}, pkg_info, key)::Union{Vector{String}, Dict{String, Any}}
+                # Compressed format with unique names:
+                if deps_pkg isa Vector{String}
+                    map[m_uuid] = deps_pkg
+                # Exapanded format:
+                else
+                    map[m_uuid] = Dict{String, UUID}(name_dep => UUID(dep_uuid::String) for (name_dep, dep_uuid) in deps_pkg)
+                end
             end
 
             # Determine strategy to find package
@@ -183,6 +198,8 @@ function ExplicitEnv(envpath::String)
     # we internally store them expanded
     deps_expanded = Dict{UUID, Dict{String, UUID}}()
     sizehint!(deps_expanded, length(deps))
+    weakdeps_expanded = Dict{UUID, Dict{String, UUID}}()
+    sizehint!(weakdeps_expanded, length(deps))
 
     if name !== nothing
         deps_expanded[pkg_uuid] = project_deps
@@ -192,18 +209,20 @@ function ExplicitEnv(envpath::String)
         lookup_strategy[pkg_uuid] = entry_point
     end
 
-    for (pkg, deps) in deps
-        # dependencies was already expanded so use it directly:
-        if deps isa Dict{String,UUID}
-            deps_expanded[pkg] = deps
-        # find the (unique) UUID associated with the name
-        else
-            deps_pkg = Dict{String, UUID}()
-            sizehint!(deps_pkg, length(deps))
-            for dep in deps
-                deps_pkg[dep] = name_to_uuid[dep]
+    for (map, map_expanded) in [(deps, deps_expanded), (weakdeps, weakdeps_expanded)]
+        for (pkg, deps) in map
+            # dependencies was already expanded so use it directly:
+            if map isa Dict{String,UUID}
+                map_expanded[pkg] = map
+            # find the (unique) UUID associated with the name
+            else
+                deps_pkg = Dict{String, UUID}()
+                sizehint!(deps_pkg, length(deps))
+                for dep in map
+                    deps_pkg[dep] = name_to_uuid[dep]
+                end
+                map_expanded[pkg] = deps_pkg
             end
-            deps_expanded[pkg] = deps_pkg
         end
     end
 
@@ -226,7 +245,7 @@ function ExplicitEnv(envpath::String)
         end
     end
 
-    return ExplicitEnv(envpath, project_deps, project_extras, deps_expanded, lookup_strategy, prefs, local_prefs)
+    return ExplicitEnv(envpath, project_deps, project_weakdeps, project_extras, deps_expanded, weakdeps_expanded, lookup_strategy, prefs, local_prefs)
 end
 
 # Marker to return when we should have been able to load a package but failed.
